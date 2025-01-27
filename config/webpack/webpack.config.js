@@ -12,6 +12,7 @@ const ReactRefreshWebpackPlugin = require("@pmmmwh/react-refresh-webpack-plugin"
 const CopyPlugin = require("copy-webpack-plugin");
 
 const isDev = process.env.NODE_ENV === "development";
+const rel = (p) => path.resolve(__dirname, "../../", p);
 
 const config = {
     mode: isDev ? "development" : "production",

@@ -1,16 +1,17 @@
 import React, { ReactNode, useEffect, useRef, useState } from "react";
-import { Particle } from "./Particle";
 import { Canvas } from "@react-three/fiber";
-import { Environment, Grid, OrbitControls, Sphere } from "@react-three/drei";
-import { generateParticle, isValidPosition, ParticleRepresentation, updateParticlePositions, findFurthestParticles, PLANET_BOUNDS, PLANET_RADIUS } from "./utils";
+import { Environment, Grid, OrbitControls, Text } from "@react-three/drei";
+import { Vector3 } from "three";
+import { generateParticle, ParticleRepresentation, updateParticlePositions, PLANET_RADIUS, isInsidePlanet, applyCollision, randomNumber, didParticlesCollide, addParticles } from "./utils";
+import { InstancedParticles } from "./Particle";
 
-export interface BaseRendererProps {
-    isLoading?: boolean;
-    children?: ReactNode;
+export interface SimulationProps {
+    replenishParticles?: boolean;
+    startParticleCount?: number;
 }
 
-export const Simulation = () => {
-    const [numParticles, setNumParticles] = useState(5);
+export const Simulation = ({ replenishParticles = false, startParticleCount = 5000 }: SimulationProps) => {
+    const [numParticles, setNumParticles] = useState(startParticleCount);
     const [particles, setParticles] = useState<ParticleRepresentation[]>([]);
     const animationFrameRef = useRef<number>();
 
@@ -19,48 +20,32 @@ export const Simulation = () => {
             let newParticles = updateParticlePositions(prevParticles);
             
             // Remove particles that have fallen into the planet
-            newParticles = newParticles.filter(particle => isValidPosition(particle.position, PLANET_BOUNDS));
+            newParticles = newParticles.filter(particle => !isInsidePlanet(particle.position));
 
             // Add new particles if count is less than numParticles
-            if (newParticles.length < numParticles) {
-                const { maxX, maxY, maxZ } = findFurthestParticles(newParticles);
-
-                for (let i = 0; i < numParticles - newParticles.length; i++) {
-                    newParticles.push(generateParticle({ maxX, maxY, maxZ }));
-                }
+            if (numParticles - newParticles.length > 100 && replenishParticles) {
+                newParticles = addParticles(newParticles, numParticles - newParticles.length);
             }
+
+            // keep particles in the same cell together
+            newParticles.sort((a, b) => a.cell.localeCompare(b.cell));
 
             // Check collisions
             for (let i = 0; i < newParticles.length; i++) {
+                const p1 = newParticles[i];
+
+                if (p1.switchColorBackAt && p1.switchColorBackAt < Date.now()) {
+                    p1.color = "hotpink";
+                }
+
                 for (let j = i + 1; j < newParticles.length; j++) {
-                    const p1 = newParticles[i];
                     const p2 = newParticles[j];
+                    
+                    // Stop checking when we reach particles in a different cell
+                    if (p1.cell !== p2.cell) break;
 
-                    const distance = p1.position.distanceTo(p2.position);
-                    const minDistance = p1.radius + p2.radius;
-
-                    if (distance < minDistance) {
-                        // Collision detected - calculate new velocities
-                        const normal = p1.position.clone().sub(p2.position).normalize();
-                        
-                        const relativeVelocity = p1.velocity.clone().sub(p2.velocity);
-                        const velocityAlongNormal = relativeVelocity.dot(normal);
-                        
-                        // Only resolve if objects are moving toward each other
-                        if (velocityAlongNormal > 0) return prevParticles;
-
-                        const restitution = 0.9; // Coefficient of restitution
-                        const j = -(1 + restitution) * velocityAlongNormal;
-                        const impulse = j / (1/p1.mass + 1/p2.mass);
-                        
-                        p1.velocity.add(normal.clone().multiplyScalar(impulse / p1.mass));
-                        p2.velocity.sub(normal.clone().multiplyScalar(impulse / p2.mass));
-
-                        // Separate particles to prevent sticking
-                        const overlap = minDistance - distance;
-                        const separationVector = normal.multiplyScalar(overlap * 0.5);
-                        p1.position.add(separationVector);
-                        p2.position.sub(separationVector);
+                    if (didParticlesCollide(p1, p2)) {
+                        applyCollision(p1, p2);
                     }
                 }
             }
@@ -85,31 +70,42 @@ export const Simulation = () => {
         setParticles(particleArray);
     }, []);
 
-    const updateNumParticles = (value: number) => {
-        setNumParticles(value);
-        const particleArray = Array.from({ length: value }, () => generateParticle());
-        setParticles(particleArray);
-    }
-
     return (
         <div style={{ width: '100vw', height: 'calc(100vh - 50px)', marginTop: 50 }}>
-            {/* <Slider value={numParticles} 
-                style={{ position: 'absolute', top: 10, left: 10, width: 'calc(100% - 20px)' }}
-                onChange={updateNumParticles} 
-                min={100} 
-                max={10000} 
-                step={100} /> */}
-
-            <Canvas shadows
-                gl={{ localClippingEnabled: true, sortObjects: false }}
-                camera={{ position: [2, 5, -10], fov: 75 }}>
+            <Canvas shadows={false}
+                gl={{ 
+                    localClippingEnabled: true, 
+                    sortObjects: false,
+                    antialias: false,
+                    powerPreference: "high-performance"
+                }}
+                camera={{ position: [2, 5, -10], fov: 75 }}
+                frameloop="demand"
+                performance={{ min: 0.5 }}>
 
                 <Environment preset="city" />
                 
-                <ambientLight intensity={0.5} />
-                <directionalLight position={[10, 10, 5]} intensity={1} />
+                <ambientLight intensity={0.3} />
+                <directionalLight position={[10, 10, 5]} intensity={0.7} castShadow={false} />
 
-                <OrbitControls enablePan={true} enableZoom={true} enableRotate={true} enableDamping={false} />
+                <OrbitControls 
+                    enablePan={true} 
+                    enableZoom={true} 
+                    enableRotate={true} 
+                    enableDamping={false}
+                    maxDistance={50}
+                    minDistance={2} 
+                />
+
+                <Text
+                    position={[0, 0, 0]}
+                    color="black"
+                    fontSize={1}
+                    font="https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxKKTU1Kg.ttf"
+                    anchorX="center"
+                    anchorY="middle">
+                    {particles.length}
+                </Text>
 
                 <Grid 
                     args={[10, 10]} 
@@ -124,15 +120,7 @@ export const Simulation = () => {
                     <meshStandardMaterial transparent opacity={0.2} color="blue" />
                 </mesh>
 
-
-                {particles.map((particle, index) => (
-                    <Particle 
-                        key={index}
-                        position={particle.position}
-                        velocity={particle.velocity}
-                        mass={particle.mass}
-                        radius={particle.radius} />
-                ))}
+                <InstancedParticles particles={particles} />
             </Canvas>
         </div>
     );
