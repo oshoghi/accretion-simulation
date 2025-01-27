@@ -1,0 +1,189 @@
+{
+  "name": "apera",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@react-three/drei": "9.94.0",
+    "@react-three/fiber": "8.15.14",
+    "@types/three": "0.148.0",
+    "i18next": "^23.7.1",
+    "i18next-browser-languagedetector": "^7.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-i18next": "^13.3.2",
+    "react-refresh": "^0.16.0",
+    "react-router-dom": "^6.20.0",
+    "react-router-prompt": "^0.7.0",
+    "three": "^0.158.0",
+    "web-vitals": "^2.1.4",
+    "zustand": "^5.0.2"
+  },
+  "optionalDependencies": {
+    "@playwright/test": "^1.41.2"
+  },
+  "devDependencies": {
+    "@actions/core": "^1.10.1",
+    "@ant-design/icons": "^5.3.0",
+    "@babel/plugin-proposal-class-properties": "^7.18.6",
+    "@babel/plugin-proposal-optional-chaining": "^7.21.0",
+    "@babel/plugin-transform-runtime": "^7.23.9",
+    "@babel/preset-env": "^7.23.9",
+    "@babel/preset-react": "^7.23.3",
+    "@babel/preset-typescript": "^7.23.3",
+    "@fortawesome/free-regular-svg-icons": "6.5.1",
+    "@fortawesome/free-solid-svg-icons": "6.5.1",
+    "@fortawesome/react-fontawesome": "0.2.0",
+    "@pmmmwh/react-refresh-webpack-plugin": "^0.5.11",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "@types/jest": "^27.5.2",
+    "@types/node": "^16.18.61",
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "@typescript-eslint/eslint-plugin": "6.17.0",
+    "@typescript-eslint/parser": "6.17.0",
+    "antd": "^5.14.1",
+    "babel-loader": "^9.1.3",
+    "case-sensitive-paths-webpack-plugin": "^2.4.0",
+    "change-case": "4.1.2",
+    "classnames": "^2.5.1",
+    "copy-webpack-plugin": "^11.0.0",
+    "css-loader": "6.8.1",
+    "css-minimizer-webpack-plugin": "^5.0.1",
+    "dayjs": "^1.11.10",
+    "env-cmd": "^10.1.0",
+    "eslint": "8.56.0",
+    "eslint-plugin-babel": "5.3.1",
+    "eslint-plugin-promise": "6.1.1",
+    "eslint-plugin-react": "7.33.2",
+    "eslint-plugin-react-hooks": "4.6.0",
+    "eslint-webpack-plugin": "^4.0.1",
+    "html-webpack-plugin": "^5.6.0",
+    "jest": "^27.5.1",
+    "jest-environment-jsdom": "^27.5.1",
+    "jest-fetch-mock": "^3.0.3",
+    "jest-watch-typeahead": "^2.2.2",
+    "mini-css-extract-plugin": "^2.8.0",
+    "re-mutable": "^1.3.0",
+    "sass": "^1.69.5",
+    "sass-loader": "^14.1.0",
+    "source-map-loader": "^5.0.0",
+    "style-loader": "^3.3.4",
+    "stylelint": "^15.11.0",
+    "stylelint-config-standard-scss": "^11.1.0",
+    "ts-loader": "9.5.1",
+    "typescript": "^4.9.5",
+    "uuid": "^9.0.1",
+    "webpack": "5.89.0",
+    "webpack-bundle-analyzer": "4.10.1",
+    "webpack-cli": "5.1.4",
+    "webpack-dev-server": "4.15.1"
+  },
+  "scripts": {
+    "clean": "rimraf ./dist ./jest-reports",
+    "start": "NODE_PATH=src NODE_ENV=development webpack-dev-server --progress --host 0.0.0.0 --config config/webpack/webpack.config.js",
+    "pack": "NODE_PATH=src NODE_ENV=production webpack --mode=production --progress --bail --config config/webpack/webpack.config.js",
+    "build": "npm run pack",
+    "devtest": "TZ=US/Pacific NODE_PATH=src jest --watch",
+    "test": "APP='' TZ=US/Pacific jest",
+    "verify": "npm run jslint && npm run test && npm run test:integration",
+    "jslint": "./node_modules/eslint/bin/eslint.js --ext .js,.tsx,.ts src tests --ignore-pattern i18 --ignore-pattern __mocks__",
+    "start-x": "X_LANG=true npm run start",
+    "test:integration": "TZ=US/Pacific PW_TEST_HTML_REPORT_OPEN='never' npx playwright test --project=chromium"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "jest": {
+    "roots": [
+      "<rootDir>/src",
+      "<rootDir>/config"
+    ],
+    "reporters": [
+      "default"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.{js,ts,jsx,ts,tsx}",
+      "!src/**/*.story.js",
+      "!src/types/*"
+    ],
+    "setupFiles": [
+      "<rootDir>/config/jest.setup.js"
+    ],
+    "testMatch": [
+      "**/*.test.*",
+      "!**/*.test.exclude.*",
+      "!**/visualTests/tests/*.test.ts"
+    ],
+    "testEnvironment": "jest-environment-jsdom",
+    "transform": {
+      "^.+\\.(js|jsx|ts|tsx)$": "<rootDir>/node_modules/babel-jest",
+      "^.+\\.css$": "<rootDir>/config/jest/cssTransform.js",
+      "^(?!.*\\.(js|jsx|ts|tsx|css|json)$)": "<rootDir>/config/jest/fileTransform.js"
+    },
+    "transformIgnorePatterns": [
+      "[/\\\\]node_modules[/\\\\].+\\.(js|jsx|ts|tsx)$",
+      "^.+\\.module\\.(css|sass|scss)$"
+    ],
+    "moduleDirectories": [
+      "node_modules",
+      "src"
+    ],
+    "modulePaths": [],
+    "moduleNameMapper": {
+      "^react-native$": "react-native-web",
+      "^.+\\.module\\.(css|sass|scss)$": "identity-obj-proxy"
+    },
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "json",
+      "jsx"
+    ],
+    "watchPlugins": [
+      "jest-watch-typeahead/filename",
+      "jest-watch-typeahead/testname"
+    ]
+  },
+  "babel": {
+    "env": {
+      "test": {
+        "presets": [
+          "@babel/env",
+          "@babel/react",
+          "@babel/preset-typescript"
+        ]
+      }
+    },
+    "presets": [
+      [
+        "@babel/env",
+        {
+          "modules": false
+        }
+      ],
+      "@babel/react",
+      "@babel/preset-typescript"
+    ],
+    "plugins": [
+      "@babel/plugin-transform-runtime",
+      "@babel/plugin-proposal-class-properties",
+      "@babel/plugin-proposal-optional-chaining"
+    ]
+  },
+  "engines": {
+    "node": ">=20",
+    "npm": ">=8"
+  }
+}
