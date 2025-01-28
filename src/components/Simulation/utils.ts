@@ -2,9 +2,11 @@ import { DoubleSide, MeshStandardMaterial, Vector3 } from "three";
 
 export const PLANET_RADIUS = 3;
 export const PLANET_BOUNDS = { maxX: PLANET_RADIUS, maxY: PLANET_RADIUS, maxZ: PLANET_RADIUS };
-export const G = 0.1; // Gravitational constant (adjusted for simulation scale)
+export const PLANET_MASS = 99999999;
 export const centerMass = 10; // Mass of the central "planet"
 export const centerPosition = new Vector3(0, 0, 0);
+export const ANIMATION_SPEED = 10;
+export const G = 6.674 * Math.pow(10, -11); // Gravitational constant
 
 export const basicMaterial = new MeshStandardMaterial({
     color: 0xc8c8c8,
@@ -42,33 +44,34 @@ export const isValidPosition = (position: Vector3, bounds: Bounds) => {
 };
 
 export const generateMass = () => randomNumber(0.001, 0.01);
-export const generateRadius = () => randomNumber(0.005, 0.1);
+export const generateRadius = () => randomNumber(0.005, 0.04);
 export const randomNumber = (min: number, max: number) => min + Math.random() * (max - min);
 
-export const generateOrbitalVelocity = (position: Vector3) => {
-    const r = position.length();
-    const speed = Math.sqrt((G * centerMass) / r);
-    
-    // Generate random reference vector instead of fixed up vector
-    const randomRef = new Vector3(
-        randomNumber(-1, 1),
-        randomNumber(-1, 1),
-        randomNumber(-1, 1)
-    ).normalize();
-    
-    // If randomRef happens to be parallel to position, generate a new one
-    if (Math.abs(randomRef.dot(position.clone().normalize())) > 0.99) {
-        randomRef.set(
-            randomNumber(-1, 1),
-            randomNumber(-1, 1),
-            randomNumber(-1, 1)
-        ).normalize();
+export const generateOrbitalVelocity = (particle: ParticleRepresentation) => {
+    const { position: p1 } = particle;
+    const orbitalRadius = p1.length();
+
+    // Ensure the radius is non-zero to avoid division by zero
+    if (orbitalRadius === 0) {
+        throw new Error("Particle is at the center of the central mass; cannot compute orbital velocity.");
     }
 
-    const orbitPlaneNormal = position.clone().cross(randomRef).normalize();
-    const velocity = position.clone().cross(orbitPlaneNormal).normalize().multiplyScalar(speed);
-    return velocity;
-}
+    // Calculate the orbital speed for a circular orbit
+    const orbitalSpeed = Math.sqrt((G * PLANET_MASS) / orbitalRadius);
+
+    // Generate a random orbital plane
+    const randomAxis = new Vector3(Math.random(), Math.random(), Math.random()).normalize();
+    const randomAngle = Math.random() * Math.PI * 2; // Random angle in radians
+
+    // Rotate the position vector around a random axis
+    const rotatedPosition = p1.clone().applyAxisAngle(randomAxis, randomAngle);
+
+    // Compute a perpendicular direction for velocity
+    const velocityDirection = rotatedPosition.clone().cross(randomAxis).normalize();
+
+    // Compute the velocity vector
+    return velocityDirection.multiplyScalar(orbitalSpeed);
+};
 
 export interface Bounds {
     maxX: number;
@@ -80,32 +83,47 @@ export const generateParticle = (bounds: Bounds | null = null): ParticleRepresen
     let position;
     do {
         position = new Vector3(
-            randomNumber(-5, 5),
-            randomNumber(-5, 5),
-            randomNumber(-5, 5)
+            randomNumber(-10, 10),
+            randomNumber(-10, 10),
+            randomNumber(-10, 10)
         );
     } while (!isValidPosition(position, bounds ?? PLANET_BOUNDS));
 
+    const mass = generateMass();
+
     return {
         position,
-        velocity: generateOrbitalVelocity(position),
-        mass: generateMass(), // mass between 0.1 and 1
+        mass,
+        velocity: generateOrbitalVelocity({ position, mass } as ParticleRepresentation),
         radius: generateRadius(), // radius between 0.1 and 0.5
         cell: getCell({ position } as ParticleRepresentation),
     };
 };
-export const ANIMATION_SPEED = 3;
 
-export const applyGravity = (particle: ParticleRepresentation) => {
-    const r = particle.position.distanceTo(centerPosition);
+export const applyGravity = (particle: ParticleRepresentation, timestep=1) => {
+    const p1 = centerPosition;
+    const m1 = centerMass;
+    const { position: p2, mass: m2, velocity: v2 } = particle;
 
-    if (r === 0) return; // Avoid division by zero
-    
-    const forceMagnitude = G * (centerMass * particle.mass) / (r * r);
-    const direction = centerPosition.clone().sub(particle.position).normalize();
-    const acceleration = direction.multiplyScalar(forceMagnitude / particle.mass);
+    // Calculate the distance vector between the two masses
+    const distanceVector = new Vector3().subVectors(p1, p2);
 
-    particle.velocity.add(acceleration.multiplyScalar(0.016 * ANIMATION_SPEED));
+    // Calculate the distance (magnitude of the distance vector)
+    const distance = distanceVector.length();
+
+    // Calculate the gravitational force magnitude
+    const forceMagnitude = (G * m1 * m2) / (distance * distance);
+
+    // Calculate the direction of the force (unit vector)
+    const forceDirection = distanceVector.clone().normalize();
+
+    // Calculate the acceleration of each mass
+    const a = forceDirection.clone().multiplyScalar(forceMagnitude / m2);
+
+    // Update velocities using the acceleration and time step
+    const vFinal = v2.clone().add(a.multiplyScalar(timestep));
+
+    particle.velocity = vFinal;
 };
 
 export const updateParticlePositions = (particles: ParticleRepresentation[]) => {
@@ -113,6 +131,7 @@ export const updateParticlePositions = (particles: ParticleRepresentation[]) => 
         applyGravity(particle);
         particle.position.add(particle.velocity.clone().multiplyScalar(0.016 * ANIMATION_SPEED));
         particle.cell = getCell(particle);
+
         return particle;
     });
 };
@@ -128,13 +147,13 @@ export const findFurthestParticles = (particles: ParticleRepresentation[]) => {
 };
 
 export const getCell = ({ position }: ParticleRepresentation) => {
-    const cellSize = 0.1;
+    const cellSize = 0.5;
 
     return [
-        Math.floor(position.x / cellSize), ",",
-        Math.floor(position.y / cellSize), ",",
-        Math.floor(position.z / cellSize),
-    ].join("");
+        Math.round(position.x / cellSize),
+        Math.round(position.y / cellSize),
+        Math.round(position.z / cellSize),
+    ].join(",");
 };
 
 export const didParticlesCollide = (p1: ParticleRepresentation, p2: ParticleRepresentation) => {
@@ -144,21 +163,35 @@ export const didParticlesCollide = (p1: ParticleRepresentation, p2: ParticleRepr
     return distance < minDistance;
 };
 
-export const applyCollision = (p1: ParticleRepresentation, p2: ParticleRepresentation) => {
-    const normal = p1.position.clone().sub(p2.position).normalize();
-    const relativeVelocity = p1.velocity.clone().sub(p2.velocity);
-    const velocityAlongNormal = relativeVelocity.dot(normal);
-    const restitution = 0.9; // Coefficient of restitution
-    const j = -(1 + restitution) * velocityAlongNormal;
-    const impulse = j / (1/p1.mass + 1/p2.mass);
+export const elasticCollision = (p1: ParticleRepresentation, p2: ParticleRepresentation, elasticity=0.8) => {
+    const { velocity: v1, mass: m1 } = p1;
+    const { velocity: v2, mass: m2 } = p2;
 
-    p1.color = "black";
-    p2.color = "black";
-    p1.switchColorBackAt = Date.now() + 1000;
-    p2.switchColorBackAt = Date.now() + 1000;
-    
-    p1.velocity.add(normal.clone().multiplyScalar(impulse / p1.mass));
-    p2.velocity.sub(normal.clone().multiplyScalar(impulse / p2.mass));
+    const relativeVelocity = new Vector3().subVectors(v1, v2);
+
+    // Calculate the velocity along the line of collision
+    const velocityAlongCollision = relativeVelocity.clone().normalize();
+
+    // Calculate the dot product of relative velocity and the collision direction
+    const dotProduct = relativeVelocity.dot(velocityAlongCollision);
+
+    // Calculate the impulse scalar
+    const impulseScalar = (-(1 + elasticity) * dotProduct) / (1/m1 + 1/m2);
+
+    // Calculate the impulse vector
+    const impulse = velocityAlongCollision.multiplyScalar(impulseScalar);
+
+    // Update the velocities after the collision
+    p1.velocity = v1.clone().add(impulse.clone().multiplyScalar(1/m1));
+    p2.velocity = v2.clone().sub(impulse.clone().multiplyScalar(1/m2));
+}
+
+export const applyCollision = (p1: ParticleRepresentation, p2: ParticleRepresentation) => {
+    elasticCollision(p1, p2);
+    // p1.color = "black";
+    // p2.color = "black";
+    // p1.switchColorBackAt = Date.now() + 1000;
+    // p2.switchColorBackAt = Date.now() + 1000;
 };
 
 export const addParticles = (particles: ParticleRepresentation[], count: number) => {

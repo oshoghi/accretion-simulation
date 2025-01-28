@@ -42,7 +42,7 @@ export const InstancedParticles = ({ particles }: { particles: ParticleRepresent
             matrix.scale(new Vector3(particle.radius /0.2, particle.radius / 0.2, particle.radius / 0.2));
             matrix.setPosition(particle.position);           
             meshRef.current!.setMatrixAt(i, matrix);
-            meshRef.current!.setColorAt(i, color.set(particle.color || "hotpink"));
+            meshRef.current!.setColorAt(i, color.set(particle.color || "gray"));
         });
         meshRef.current.instanceMatrix.needsUpdate = true;
         meshRef.current.instanceColor!.needsUpdate = true;
